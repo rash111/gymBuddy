@@ -300,6 +300,25 @@ metadata:
           
           No issues found. The "Loading..." bug is fully resolved.
 
+##  Bug-fix Verification Run — 2026-07-01 (round 2)
+##  ------------------------------------------------
+##  All 9 tests verified.  7 PASS, 2 N/A (today = rest day in generated plan,
+##  so Start/Restart workout flow & Calories Burnt card conditional could not
+##  be exercised in-session; code review by testing agent confirms correctness).
+##    TEST 1 BackButton (9 pages)             PASS
+##    TEST 2 Diet Reset + confirmation        PASS
+##    TEST 3 FoodScanner auto-navigate /diet  PASS
+##    TEST 4 Workout Completed / Restart      N/A (rest day)
+##    TEST 5 Weekly Plan status badges        PASS
+##    TEST 6 AI Re-gen no longer fails        PASS (no TypeError)
+##    TEST 7 Sign Out from Profile            PASS
+##    TEST 8 Calories Burnt card conditional  N/A (rest day)
+##    TEST 9 Profile button near streak       PASS
+##
+##  Post-test tweak: navigate("/welcome") BEFORE awaiting logout() in Profile.jsx
+##  to avoid ProtectedRoute race sending user to /login instead of /welcome.
+
+
 metadata:
   created_by: "main_agent"
   version: "1.2"

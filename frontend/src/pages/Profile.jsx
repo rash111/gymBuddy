@@ -46,9 +46,11 @@ export default function Profile() {
 
             <Button data-testid="logout-btn" onClick={async () => {
                 try {
+                    // Navigate FIRST so ProtectedRoute doesn't race us to /login
+                    // when the user state becomes false.
+                    navigate("/welcome", { replace: true });
                     await logout();
                     toast.success("Signed out.");
-                    navigate("/welcome", { replace: true });
                 } catch (e) {
                     toast.error("Failed to sign out. Please try again.");
                 }
