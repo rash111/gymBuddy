@@ -255,10 +255,40 @@ const handlers = {
         const { data } = await supabase.from("meal_logs").insert({ user_id: user.id, ...body, date: new Date().toISOString() }).select().single();
         return data;
     },
+    async searchMeal(query) {
+        // Calls the FastAPI backend meal-search endpoint (public, uses EMERGENT_LLM_KEY)
+        const url = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "") + "/api/meal-search";
+        try {
+            const resp = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({ detail: `HTTP ${resp.status}` }));
+                throw { response: { data: err } };
+            }
+            return await resp.json();
+        } catch (e) {
+            if (e?.response) throw e;
+            throw { response: { data: { detail: e?.message || "Search failed" } } };
+        }
+    },
     async getMeals(days = 7) {
         const user = await requireUser();
         const since = new Date(Date.now() - days * 86400000).toISOString();
         const { data } = await supabase.from("meal_logs").select("*").eq("user_id", user.id).gte("date", since).order("date", { ascending: false });
+        return data || [];
+    },
+    async getMealsByDate(dateISO) {
+        // dateISO = "YYYY-MM-DD" — returns meals logged on that local calendar day
+        const user = await requireUser();
+        const start = new Date(dateISO); start.setHours(0, 0, 0, 0);
+        const end = new Date(dateISO); end.setHours(23, 59, 59, 999);
+        const { data } = await supabase.from("meal_logs")
+            .select("*").eq("user_id", user.id)
+            .gte("date", start.toISOString()).lte("date", end.toISOString())
+            .order("date", { ascending: false });
         return data || [];
     },
     async resetTodayMeals() {
@@ -370,6 +400,8 @@ const route = async (method, url, body) => {
     if (u === "/diet-plan/regenerate" && m === "post") return handlers.regenDietPlan();
     if (u === "/meals" && m === "post") return handlers.logMeal(body);
     if (u === "/meals" && m === "get") return handlers.getMeals();
+    if (u.startsWith("/meals/by-date/") && m === "get") return handlers.getMealsByDate(u.slice("/meals/by-date/".length));
+    if (u === "/meal-search" && m === "post") return handlers.searchMeal(body?.query);
     if (u === "/meals/reset-today" && m === "post") return handlers.resetTodayMeals();
     if (u === "/workout-sessions/reset-today" && m === "post") return handlers.resetTodayWorkout();
     if (u === "/workout-sessions/today" && m === "get") return handlers.getTodaySessions();

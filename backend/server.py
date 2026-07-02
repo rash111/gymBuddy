@@ -673,6 +673,84 @@ async def dashboard(user: dict = Depends(get_current_user)):
         "streak": full.get("streak", 0),
     }
 
+# ===== MEAL SEARCH (Public — used by /diet Search Meal feature) =====
+class MealSearchReq(BaseModel):
+    query: str
+
+@api.post("/meal-search")
+async def meal_search(req: MealSearchReq):
+    """
+    Return nutrition data for any dish worldwide. No auth required (public
+    read-only endpoint used from the /diet screen search box). Uses the
+    Emergent LLM (OpenAI GPT-4.1-mini) to synthesise nutrition estimates.
+    Response schema (always):
+      {
+        "name": str, "cuisine": str, "description": str,
+        "portions": {
+          "small":  { "label": "Small",  "grams": int, "calories": int, "protein_g": int, "carbs_g": int, "fats_g": int },
+          "medium": { ...same shape... },
+          "large":  { ...same shape... }
+        }
+      }
+    """
+    import json, re
+    q = (req.query or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="query required")
+    if len(q) > 200:
+        raise HTTPException(status_code=400, detail="query too long")
+
+    system = (
+        "You are a nutrition database. Given ANY dish name from anywhere in the world, "
+        "return realistic nutrition estimates for three portion sizes. "
+        "Respond with STRICT JSON ONLY (no prose, no markdown fences). "
+        "Schema: {\n"
+        "  \"name\": string,\n"
+        "  \"cuisine\": string,   // e.g. Indian, Italian, Japanese\n"
+        "  \"description\": string,\n"
+        "  \"portions\": {\n"
+        "    \"small\":  { \"label\":\"Small\",  \"grams\": number, \"calories\": number, \"protein_g\": number, \"carbs_g\": number, \"fats_g\": number },\n"
+        "    \"medium\": { \"label\":\"Medium\", \"grams\": number, \"calories\": number, \"protein_g\": number, \"carbs_g\": number, \"fats_g\": number },\n"
+        "    \"large\":  { \"label\":\"Large\",  \"grams\": number, \"calories\": number, \"protein_g\": number, \"carbs_g\": number, \"fats_g\": number }\n"
+        "  }\n"
+        "}\n"
+        "Small ~ 150g, Medium ~ 250g, Large ~ 400g (adjust to what a real portion of that dish looks like)."
+    )
+    try:
+        raw = await ai_call(f"meal-search-{uuid.uuid4()}", system, f"Dish: {q}")
+    except Exception as e:
+        logger.warning("meal-search LLM error: %s", e)
+        raise HTTPException(status_code=502, detail="AI search unavailable, try again")
+
+    # Robust JSON extraction — LLM may still wrap in ```json``` blocks
+    txt = raw.strip()
+    m = re.search(r"\{.*\}", txt, re.DOTALL)
+    if not m:
+        raise HTTPException(status_code=502, detail="Could not parse AI response")
+    try:
+        parsed = json.loads(m.group(0))
+    except Exception:
+        raise HTTPException(status_code=502, detail="Invalid AI response format")
+
+    # Validate & coerce
+    portions = parsed.get("portions") or {}
+    for key in ("small", "medium", "large"):
+        p = portions.get(key) or {}
+        portions[key] = {
+            "label": p.get("label") or key.capitalize(),
+            "grams": int(p.get("grams") or [150, 250, 400][("small","medium","large").index(key)]),
+            "calories": int(p.get("calories") or 0),
+            "protein_g": int(p.get("protein_g") or 0),
+            "carbs_g": int(p.get("carbs_g") or 0),
+            "fats_g": int(p.get("fats_g") or 0),
+        }
+    return {
+        "name": parsed.get("name") or q.title(),
+        "cuisine": parsed.get("cuisine") or "",
+        "description": parsed.get("description") or "",
+        "portions": portions,
+    }
+
 # Mount router
 app.include_router(api)
 

@@ -109,6 +109,82 @@ user_problem_statement: |
   Code-side improvements added: friendly error translation + handle session=null case when
   email confirmation is required.
 
+
+backend:
+  - task: "POST /api/meal-search endpoint - AI-powered worldwide meal nutrition search"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: |
+          ✅ ALL 5 TESTS PASSED - POST /api/meal-search endpoint fully functional!
+          
+          Endpoint: POST /api/meal-search (PUBLIC, no auth required)
+          Uses: EMERGENT_LLM_KEY via emergentintegrations (OpenAI GPT-4.1-mini)
+          Test URL: http://localhost:8001/api/meal-search
+          
+          TEST 1 - Happy Path (chicken biryani): ✅ PASS
+          - HTTP 200 returned
+          - Full schema present: name, cuisine, description, portions
+          - All 3 portions present: small, medium, large
+          - Each portion has all 6 required fields: label, grams, calories, protein_g, carbs_g, fats_g
+          - Grams increase correctly: small (150g) < medium (250g) < large (400g)
+          - Response: Chicken Biryani, Indian cuisine, detailed description
+          
+          TEST 2 - Second Query (sushi): ✅ PASS
+          - HTTP 200 returned
+          - Cuisine correctly identified as "Japanese"
+          - Full schema with all portions and fields present
+          - Response: Sushi, Japanese cuisine, detailed description
+          
+          TEST 3 - Empty Query Validation: ✅ PASS
+          - Sent: {"query": ""}
+          - HTTP 400 returned (as expected)
+          - Detail: "query required" (exact match)
+          
+          TEST 4 - Missing Body Validation: ✅ PASS
+          - Sent: POST with no body
+          - HTTP 422 returned (Pydantic validation error, as expected)
+          - Proper validation error structure returned
+          
+          TEST 5 - Long Query Validation: ✅ PASS
+          - Sent: 251 character query
+          - HTTP 400 returned (as expected)
+          - Detail: "query too long" (exact match)
+          - Validation correctly enforces 200 char limit (line 700 in server.py)
+          
+          INTEGRATION VERIFICATION:
+          - EMERGENT_LLM_KEY working correctly (sk-emergent-eCcFc59637b6443529)
+          - LLM integration via emergentintegrations library functional
+          - OpenAI GPT-4.1-mini model responding correctly
+          - JSON parsing and schema validation working
+          - Error handling for empty/missing/long queries working correctly
+          
+          BACKEND LOGS:
+          - No errors in backend logs
+          - LiteLLM completion logs show successful GPT-4.1-mini calls
+          - Storage initialized successfully
+          
+          SCHEMA VALIDATION:
+          All responses match the required schema:
+          {
+            "name": string,
+            "cuisine": string,
+            "description": string,
+            "portions": {
+              "small":  { "label": string, "grams": int, "calories": int, "protein_g": int, "carbs_g": int, "fats_g": int },
+              "medium": { "label": string, "grams": int, "calories": int, "protein_g": int, "carbs_g": int, "fats_g": int },
+              "large":  { "label": string, "grams": int, "calories": int, "protein_g": int, "carbs_g": int, "fats_g": int }
+            }
+          }
+          
+          No issues found. Endpoint is production-ready.
+
 frontend:
   - task: "Signup error handling — friendly messages for Supabase Auth errors (rate limit, already registered, invalid credentials, email not confirmed, weak password)"
     implemented: true
@@ -321,22 +397,20 @@ metadata:
 
 metadata:
   created_by: "main_agent"
-  version: "1.2"
-  test_sequence: 3
+  version: "1.3"
+  test_sequence: 4
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Back button navigation across screens"
-    - "Diet: Reset button replaces refresh, with confirmation, wipes today's meals"
-    - "FoodScanner: navigates to /diet after logging a meal"
-    - "TodayWorkout: shows Completed badge; shows Restart/Do More instead of Start when completed"
-    - "Restart today's workout confirmation dialog + reset of today's session"
-    - "WeeklyPlan: per-day status (Completed / Missed / Upcoming / Today / Rest)"
-    - "WeeklyPlan: AI Re-gen no longer fails (profile bug fixed)"
-    - "Profile: Sign Out works and navigates to /welcome"
-    - "Dashboard: Calories Burnt Today card shown ONLY when today's workout is complete"
-    - "Dashboard: Profile button moved next to streak pill; Profile removed from bottom nav"
+    - "Onboarding: 8 steps (About You, Goal 10 opts, Training Setup + duration, Equipment, Workout Styles, Injuries, Medical Conditions + disclaimer, Diet)"
+    - "Onboarding: multi-select Workout Styles and Injuries persist through submit"
+    - "Onboarding: medical disclaimer visible on step 7"
+    - "Diet: Your Meals (plan meals) section REMOVED"
+    - "Diet: Search Meal (worldwide, AI-powered) returns 3 portion options and Log Meal saves to Today's Meals"
+    - "Diet: Meal History date picker below — selecting a past date shows meals or 'No meals recorded.'"
+    - "Profile: Body Metrics card (Height / Weight / BMI) with BMI category pill"
+    - "Profile: BMI updates when a new weight is logged via /progress"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -697,3 +771,35 @@ agent_communication:
       invalid sessions, Supabase API errors, and profile fetch failures.
       
       No issues found. Ready for production.
+
+  - agent: "testing"
+    message: |
+      ✅ POST /api/meal-search ENDPOINT TESTING COMPLETE - ALL 5 TESTS PASSED!
+      
+      Tested the new meal search endpoint (lines 680-752 in /app/backend/server.py):
+      
+      RESULTS:
+      ✅ TEST 1: Happy path (chicken biryani) - PASS
+         - HTTP 200, full schema with all portions (small/medium/large)
+         - All 6 fields per portion present (label, grams, calories, protein_g, carbs_g, fats_g)
+         - Grams increase correctly: 150g < 250g < 400g
+      
+      ✅ TEST 2: Second query (sushi) - PASS
+         - HTTP 200, cuisine correctly identified as "Japanese"
+      
+      ✅ TEST 3: Empty query - PASS
+         - HTTP 400 with detail "query required"
+      
+      ✅ TEST 4: Missing body - PASS
+         - HTTP 422 (Pydantic validation error)
+      
+      ✅ TEST 5: Long query (251 chars) - PASS
+         - HTTP 400 with detail "query too long"
+      
+      INTEGRATION STATUS:
+      - EMERGENT_LLM_KEY working correctly
+      - OpenAI GPT-4.1-mini via emergentintegrations responding properly
+      - JSON parsing and schema validation working
+      - Error handling for all edge cases working
+      
+      No issues found. Endpoint is production-ready and ready for frontend integration.
